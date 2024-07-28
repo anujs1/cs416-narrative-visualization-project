@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Scene 3: Interactive Scatter Plot</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="../styles/styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h2>Scene 3: Highway MPG vs. City MPG</h2>
+        <svg width="800" height="600"></svg>
+        <div class="selectors">
+            <label for="fuel-select">Select Fuel Type:</label>
+            <select id="fuel-select">
+                <option value="all">All</option>
+            </select>
+            <label for="make-select">Select Make:</label>
+            <select id="make-select">
+                <option value="all">All</option>
+            </select>
+        </div>
+        <button onclick="window.location.href='scene2.html'">Back</button>
+    </div>
+    <script>
+        const margin = { top: 20, right: 30, bottom: 50, left: 50 },
+            width = 800 - margin.left - margin.right,
+            height = 600 - margin.top - margin.bottom;
+
+        const svg = d3.select("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear().range([0, width]);
+        const y = d3.scaleLinear().range([height, 0]);
+        const xAxis = svg.append("g").attr("transform", `translate(0,${height})`);
+        const yAxis = svg.append("g");
+
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        function updateScatterPlot(data) {
+            x.domain([0, d3.max(data, d => d.AverageHighwayMPG)]).nice();
+            y.domain([0, d3.max(data, d => d.AverageCityMPG)]).nice();
+
+            xAxis.transition().call(d3.axisBottom(x));
+            yAxis.transition().call(d3.axisLeft(y));
+
+            const dots = svg.selectAll(".dot").data(data, d => d.id);
+
+            dots.exit().remove();
+
+            dots.enter().append("circle")
+                .attr("class", "dot")
+                .attr("r", 5)
+                .on("mouseover", (event, d) => {
+                    tooltip.transition().duration(200).style("opacity", .9);
+                    tooltip.html(`Make: ${d.Make}<br>Fuel: ${d.Fuel}<br>Highway MPG: ${d.AverageHighwayMPG}<br>City MPG: ${d.AverageCityMPG}`)
+                        .style("left", (event.pageX + 5) + "px")
+                        .style("top", (event.pageY - 28) + "px");
+                })
+                .on("mouseout", (event, d) => {
+                    tooltip.transition().duration(500).style("opacity", 0);
+                })
+                .merge(dots)
+                .transition()
+                .attr("cx", d => x(d.AverageHighwayMPG))
+                .attr("cy", d => y(d.AverageCityMPG))
+                .style("fill", d => color(d.Fuel));
+        }
+
+        d3.csv("../data/cars2017.csv").then(data => {
+            data.forEach((d, i) => {
+                d.id = i;
+                d.AverageHighwayMPG = +d.AverageHighwayMPG;
+                d.AverageCityMPG = +d.AverageCityMPG;
+            });
+
+            const fuelTypes = Array.from(new Set(data.map(d => d.Fuel)));
+            const makeTypes = Array.from(new Set(data.map(d => d.Make)));
+
+            const fuelSelect = d3.select("#fuel-select");
+            const makeSelect = d3.select("#make-select");
+
+            fuelTypes.forEach(fuel => {
+                fuelSelect.append("option").attr("value", fuel).text(fuel);
+            });
+
+            makeTypes.forEach(make => {
+                makeSelect.append("option").attr("value", make).text(make);
+            });
+
+            function filterData() {
+                const selectedFuelType = fuelSelect.node().value;
+                const selectedMake = makeSelect.node().value;
+                let filteredData = data;
+
+                if (selectedFuelType !== "all") {
+                    filteredData = filteredData.filter(d => d.Fuel === selectedFuelType);
+                }
+                if (selectedMake !== "all") {
+                    filteredData = filteredData.filter(d => d.Make === selectedMake);
+                }
+                updateScatterPlot(filteredData);
+            }
+
+            fuelSelect.on("change", filterData);
+            makeSelect.on("change", filterData);
+
+            updateScatterPlot(data);
+        });
+    </script>
+</body>
+
+</html>
